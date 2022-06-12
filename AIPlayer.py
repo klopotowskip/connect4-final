@@ -60,22 +60,107 @@ def score_position(board, piece):
     return score
 
 
+def winning_move(board, piece):
+    # Check horizontal locations for win
+    for c in range(BOARD_WIDTH - 3):
+        for r in range(BOARD_HEIGHT):
+            if board[r][c] == piece and board[r][c + 1] == piece and board[r][c + 2] == piece and board[r][
+                c + 3] == piece:
+                return True
+
+    # Check vertical locations for win
+    for c in range(BOARD_WIDTH):
+        for r in range(BOARD_HEIGHT - 3):
+            if board[r][c] == piece and board[r + 1][c] == piece and board[r + 2][c] == piece and board[r + 3][
+                c] == piece:
+                return True
+
+    # Check positively sloped diaganols
+    for c in range(BOARD_WIDTH - 3):
+        for r in range(BOARD_HEIGHT - 3):
+            if board[r][c] == piece and board[r + 1][c + 1] == piece and board[r + 2][c + 2] == piece and board[r + 3][
+                c + 3] == piece:
+                return True
+
+    # Check negatively sloped diaganols
+    for c in range(BOARD_WIDTH - 3):
+        for r in range(3, BOARD_HEIGHT):
+            if board[r][c] == piece and board[r - 1][c + 1] == piece and board[r - 2][c + 2] == piece and board[r - 3][
+                c + 3] == piece:
+                return True
+
+
+def is_terminal_node(board):
+    return winning_move(board, HUMAN_VALUE) or winning_move(board, AI_VALUE) or len(utils.showLegalMoves(board)) == 0
+
+
+def minimax(board, depth, alpha, beta, maximizingPlayer):
+    valid_locations = utils.showLegalMoves(board)
+    is_terminal = is_terminal_node(board)
+    if depth == 0 or is_terminal:
+        if is_terminal:
+            if winning_move(board, AI_VALUE):
+                return None, 100000000000000
+            elif winning_move(board, HUMAN_VALUE):
+                return None, -10000000000000
+            else:  # Game is over, no more valid moves
+                return None, 0
+        else:  # Depth is zero
+            return None, score_position(board, AI_VALUE)
+    if maximizingPlayer:
+        value = -math.inf
+        column = random.choice(valid_locations)
+        for col in valid_locations:
+            b_copy = board.copy()
+            utils.makeAMove(b_copy, col, AI_VALUE)
+            new_score = minimax(b_copy, depth - 1, alpha, beta, False)[1]
+            if new_score > value:
+                value = new_score
+                column = col
+            alpha = max(alpha, value)
+            if alpha >= beta:
+                break
+        return column, value
+
+    else:  # Minimizing player
+        value = math.inf
+        column = random.choice(valid_locations)
+        for col in valid_locations:
+            b_copy = board.copy()
+            utils.makeAMove(b_copy, col, HUMAN_VALUE)
+            new_score = minimax(b_copy, depth - 1, alpha, beta, True)[1]
+            if new_score < value:
+                value = new_score
+                column = col
+            beta = min(beta, value)
+            if alpha >= beta:
+                break
+        return column, value
+
+
+def pick_best_move(board, piece):
+    valid_locations = utils.showLegalMoves(board)
+
+    best_score = -9999999
+    best_col = random.choice(valid_locations)
+
+    for col in valid_locations:
+        temp_board = board.copy()
+        utils.makeAMove(temp_board, col, piece)
+        score = score_position(temp_board, piece)
+
+        if score > best_score:
+            best_score = score
+            best_col = col
+
+    return best_col
+
+
 class AIPlayer:
     def __init__(self):
         pass
 
     def makeAMove(self, game: Game):
-        legal = game.showLegalMoves()
+        col, minimax_score = minimax(game.getBoard(), 6, -math.inf, math.inf, True)
 
-        max_score = -math.inf
-        best_move = random.choice(legal)
-        for move in legal:
-            board_n = game.getBoard()
-            utils.makeAMove(board_n, move, AI_VALUE)
-
-            score = score_position(board_n, AI_VALUE)
-
-            if score > max_score:
-                max_score = score
-                best_move = move
-        return game.makeAMove(best_move)
+        return game.makeAMove(col)
