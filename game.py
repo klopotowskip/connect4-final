@@ -26,6 +26,7 @@ class Game:
         victory = utils.checkForVictory(self._board, value, row, col)
         if victory:
             self.winner = HUMAN_LABEL if value == HUMAN_VALUE else AI_LABEL
+            print("Winner is {}", self.winner)
 
         utils.print_board(self._board)
 
