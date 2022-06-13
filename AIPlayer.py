@@ -6,87 +6,75 @@ from game import Game
 from constants import *
 
 
-def assess_points(window, piece):
+def getChunkPoints(chunk, piece):
     enemy_piece = AI_VALUE if piece == HUMAN_VALUE else AI_VALUE
     score = 0
 
-    if window.count(piece) == 4:
+    if chunk.count(piece) == 4:
         score += 100
-    elif window.count(piece) == 3 and window.count(VOID_VALUE) == 1:
+    elif chunk.count(piece) == 3 and chunk.count(VOID_VALUE) == 1:
         score += 10
-    elif window.count(piece) == 2 and window.count(VOID_VALUE) == 2:
+    elif chunk.count(piece) == 2 and chunk.count(VOID_VALUE) == 2:
         score += 3
 
-    if window.count(enemy_piece) == 3 and window.count(VOID_VALUE) == 1:
+    if chunk.count(enemy_piece) == 3 and chunk.count(VOID_VALUE) == 1:
         score -= 6
 
     return score
 
 
-def score_position(board, piece):
-    score = 0
+def getPositionPoints(board, piece):
+    points = 0
 
-    # Score center
+    # Bonus from center column
     center_array = [int(i) for i in list(board[:, BOARD_WIDTH // 2])]
     center_count = center_array.count(piece)
-    score += 3 * center_count
+    points += 3 * center_count
 
-    # Horizontal
     for r in range(BOARD_HEIGHT):
         row_array = [int(i) for i in list(board[r, :])]
         for c in range(BOARD_WIDTH - 3):
-            window = row_array[c:c + CHUNK_SIZE]
-            score += assess_points(window, piece)
+            chunk = row_array[c:c + CHUNK_SIZE]
+            points += getChunkPoints(chunk, piece)
 
-    # Vertical
     for c in range(BOARD_WIDTH):
         col_array = [int(i) for i in list(board[:, c])]
         for r in range(BOARD_HEIGHT - 3):
-            window = col_array[r:r + CHUNK_SIZE]
-            score += assess_points(window, piece)
+            chunk = col_array[r:r + CHUNK_SIZE]
+            points += getChunkPoints(chunk, piece)
 
-    # Positive sloped diag
     for r in range(BOARD_HEIGHT - 3):
         for c in range(BOARD_WIDTH - 3):
-            window = [board[r + i][c + i] for i in range(CHUNK_SIZE)]
-            score += assess_points(window, piece)
+            chunk = [board[r + i][c + i] for i in range(CHUNK_SIZE)]
+            points += getChunkPoints(chunk, piece)
 
-    # Negative sloped diag
     for r in range(BOARD_HEIGHT - 3):
         for c in range(BOARD_WIDTH - 3):
-            window = [board[r + 3 - i][c + i] for i in range(CHUNK_SIZE)]
-            score += assess_points(window, piece)
+            chunk = [board[r + 3 - i][c + i] for i in range(CHUNK_SIZE)]
+            points += getChunkPoints(chunk, piece)
 
-    return score
+    return points
 
 
-def winning_move(board, piece):
-    # Check horizontal locations for win
+def winning_move(board, player_value):
     for c in range(BOARD_WIDTH - 3):
         for r in range(BOARD_HEIGHT):
-            if board[r][c] == piece and board[r][c + 1] == piece and board[r][c + 2] == piece and board[r][
-                c + 3] == piece:
+            if board[r][c] == player_value and board[r][c + 1] == player_value and board[r][c + 2] == player_value and board[r][c + 3] == player_value:
                 return True
 
-    # Check vertical locations for win
     for c in range(BOARD_WIDTH):
         for r in range(BOARD_HEIGHT - 3):
-            if board[r][c] == piece and board[r + 1][c] == piece and board[r + 2][c] == piece and board[r + 3][
-                c] == piece:
+            if board[r][c] == player_value and board[r + 1][c] == player_value and board[r + 2][c] == player_value and board[r + 3][c] == player_value:
                 return True
 
-    # Check positively sloped diaganols
     for c in range(BOARD_WIDTH - 3):
         for r in range(BOARD_HEIGHT - 3):
-            if board[r][c] == piece and board[r + 1][c + 1] == piece and board[r + 2][c + 2] == piece and board[r + 3][
-                c + 3] == piece:
+            if board[r][c] == player_value and board[r + 1][c + 1] == player_value and board[r + 2][c + 2] == player_value and board[r + 3][c + 3] == player_value:
                 return True
 
-    # Check negatively sloped diaganols
     for c in range(BOARD_WIDTH - 3):
         for r in range(3, BOARD_HEIGHT):
-            if board[r][c] == piece and board[r - 1][c + 1] == piece and board[r - 2][c + 2] == piece and board[r - 3][
-                c + 3] == piece:
+            if board[r][c] == player_value and board[r - 1][c + 1] == player_value and board[r - 2][c + 2] == player_value and board[r - 3][c + 3] == player_value:
                 return True
 
 
@@ -94,26 +82,27 @@ def is_terminal_node(board):
     return winning_move(board, HUMAN_VALUE) or winning_move(board, AI_VALUE) or len(utils.showLegalMoves(board)) == 0
 
 
-def minimax(board, depth, alpha, beta, maximizingPlayer):
+def minimax(board, level, alpha, beta, maximizing):
     valid_locations = utils.showLegalMoves(board)
     is_terminal = is_terminal_node(board)
-    if depth == 0 or is_terminal:
-        if is_terminal:
-            if winning_move(board, AI_VALUE):
-                return None, 100000000000000
-            elif winning_move(board, HUMAN_VALUE):
-                return None, -10000000000000
-            else:  # Game is over, no more valid moves
-                return None, 0
-        else:  # Depth is zero
-            return None, score_position(board, AI_VALUE)
-    if maximizingPlayer:
+
+    if is_terminal:
+        if winning_move(board, AI_VALUE):
+            return None, math.inf
+        elif winning_move(board, HUMAN_VALUE):
+            return None, -math.inf
+        else:
+            return None, 0
+    elif level == 0:
+        return None, getPositionPoints(board, AI_VALUE)
+
+    if maximizing:
         value = -math.inf
         column = random.choice(valid_locations)
         for col in valid_locations:
-            b_copy = board.copy()
-            utils.makeAMove(b_copy, col, AI_VALUE)
-            new_score = minimax(b_copy, depth - 1, alpha, beta, False)[1]
+            board_c = board.copy()
+            utils.makeAMove(board_c, col, AI_VALUE)
+            new_score = minimax(board_c, level - 1, alpha, beta, False)[1]
             if new_score > value:
                 value = new_score
                 column = col
@@ -122,13 +111,13 @@ def minimax(board, depth, alpha, beta, maximizingPlayer):
                 break
         return column, value
 
-    else:  # Minimizing player
+    else:
         value = math.inf
         column = random.choice(valid_locations)
         for col in valid_locations:
-            b_copy = board.copy()
-            utils.makeAMove(b_copy, col, HUMAN_VALUE)
-            new_score = minimax(b_copy, depth - 1, alpha, beta, True)[1]
+            board_c = board.copy()
+            utils.makeAMove(board_c, col, HUMAN_VALUE)
+            new_score = minimax(board_c, level - 1, alpha, beta, True)[1]
             if new_score < value:
                 value = new_score
                 column = col
@@ -138,22 +127,22 @@ def minimax(board, depth, alpha, beta, maximizingPlayer):
         return column, value
 
 
-def pick_best_move(board, piece):
-    valid_locations = utils.showLegalMoves(board)
+def bestMovePossible(board, piece):
+    legal_moves = utils.showLegalMoves(board)
 
-    best_score = -9999999
-    best_col = random.choice(valid_locations)
+    max_points = -math.inf
+    max_points_col = random.choice(legal_moves)
 
-    for col in valid_locations:
+    for col in legal_moves:
         temp_board = board.copy()
         utils.makeAMove(temp_board, col, piece)
-        score = score_position(temp_board, piece)
+        score = getPositionPoints(temp_board, piece)
 
-        if score > best_score:
-            best_score = score
-            best_col = col
+        if score > max_points:
+            max_points = score
+            max_points_col = col
 
-    return best_col
+    return max_points_col
 
 
 class AIPlayer:
